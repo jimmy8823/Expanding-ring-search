@@ -70,14 +70,7 @@ void fill_icmp_h(struct icmp* icmp_hdr){
     icmp_hdr->icmp_id = 123;
     icmp_hdr->icmp_seq = 0;
 }
-void print_ip_addr(uint8_t *ip_addr){
-	for(int i=0;i<4;i++){
-		if(i==3)
-			printf("%u",ip_addr[i]);
-		else
-			printf("%u.",ip_addr[i]);
-	}
-}
+
 int main(int argc ,char* argv[]){
     int sockfd = 0, sockfd_recv = 0;
     int ttl = 0;
@@ -88,8 +81,6 @@ int main(int argc ,char* argv[]){
     struct sockaddr_in sa;
     struct in_addr dst,*src;
     struct ifreq req;
-    struct timeval t;
-    struct hostent *src_hp;
     char src_ip[15];
     char *my_ip;
     fd_set sockfds;
@@ -124,7 +115,7 @@ int main(int argc ,char* argv[]){
 
     struct sockaddr from;
     int from_addr_len = sizeof(from);
-    for(int i=1;i<=ttl;i++){
+    for(int i=1;i<=ttl;i++){{
         memset(send_buf,'\0',sizeof(send_buf));
         ip_hdr =(struct ip *)send_buf;
         icmp_hdr =(struct icmp *) (send_buf+IP_HDRLEN);
