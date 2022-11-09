@@ -45,11 +45,6 @@ unsigned short checksum(unsigned short *addr,int len){
     return result;
 }
 
-/*void fill_eth_h(struct ether_header* eth_hdr,unsigned char* src_mac,unsigned char* dst_mac){
-    memcpy(eth_hdr->ether_shost,&src_mac,ETH_ALEN);
-    memcpy(eth_hdr->ether_dhost,&dst_mac,ETH_ALEN);
-    eth_hdr->ether_type = htons(ETH_P_IP);
-}*/
 void fill_ip_h(struct ip* ip_hdr,struct sockaddr src,char *dst ,int ttl){
     //struct hostent *src_hp,*dst_hp;
     struct in_addr dst_ip,src_ip;
@@ -91,7 +86,7 @@ int main(int argc ,char* argv[]){
     struct ip *ip_hdr;
     struct icmp *icmp_hdr;
     struct sockaddr_in sa;
-    struct in_addr dst,src;
+    struct in_addr dst,*src;
     struct ifreq req;
     struct timeval t;
     struct hostent *src_hp;
@@ -117,28 +112,16 @@ int main(int argc ,char* argv[]){
     memset(send_buf,'\0',sizeof(send_buf));
     memset(&req,'\0',sizeof(req));
 	strncpy(req.ifr_name, DEVICE_NAME,IF_NAMESIZE-1);
-	if(ioctl(sockfd,SIOGIFINDEX,&req) < 0){//get interface index and store in req
-		perror("get ifindex failed\n");
-	}
 	if(ioctl(sockfd,SIOCGIFADDR,&req) < 0){//get interface ip and store in req
 		perror("get ip failed\n");
 	}
-	if(ioctl(sockfd,SIOCGIFHWADDR,&req) < 0){//get interface MAC and store in req
-		perror("get MAC failed\n");
-	}
-    src_hp = gethostbyname(DEVICE_NAME);
-    src = (*(struct in_addr *)src_hp->h_addr);
-    //inet_ntop(AF_INET,&src,my_ip,INET_ADDRSTRLEN);
+    my_ip = inet_ntoa(((struct sockaddr_in *)&(req.ifr_addr))->sin_addr);
     inet_pton(AF_INET,argv[2],&dst);
     sa.sin_family = AF_INET;
     sa.sin_addr = dst;
     char *p;
-    ttl = strtol(argv[1],&p,10);
-    
-    //printf("hop : %d  ip: %s\n",ttl,argv[2]);
+    ttl = strtol(argv[1],&p,10);// change number string to int 
 
-    FD_ZERO(&sockfds);
-    FD_SET(sockfd_recv,&sockfds);
     struct sockaddr from;
     int from_addr_len = sizeof(from);
     for(int i=1;i<=ttl;i++){
@@ -155,12 +138,7 @@ int main(int argc ,char* argv[]){
         if(send_result = sendto(sockfd,send_buf,sizeof(send_buf),0,(struct sockaddr *)&sa,sizeof(struct sockaddr_in))<0){
             perror("send packet failed\n");
         }
-        t.tv_sec = 5;
-        t.tv_usec = 0;
-        // recv
-        if((recv_result=select(sockfd_recv+1,&sockfds,NULL,NULL,&t))<0){
-            perror("select error");
-        }else if(recv_result > 0){
+        while(1){
             memset(recv_buf,'\0',sizeof(recv_buf));
             recvfrom(sockfd_recv,recv_buf,sizeof(recv_buf),0,&from,(socklen_t *)from_addr_len);
             ip_hdr =(struct ip *)(recv_buf + ETHER_HDR_LEN);
@@ -168,13 +146,15 @@ int main(int argc ,char* argv[]){
             inet_ntop(AF_INET,&inaddr,src_ip,INET_ADDRSTRLEN);
             if(ip_hdr->ip_p==IPPROTO_ICMP && strcmp(src_ip,my_ip)!=0){ //icmp packet
                 icmp_hdr = (struct icmp *)(recv_buf + ETHER_HDR_LEN + IP_HDRLEN);
-                if(icmp_hdr->icmp_type==ICMP_TIMXCEED){
-                    printf("%d  Src ip : %s my_ip: %s(time exceed)\n",i,src_ip,my_ip);
-                }else if(icmp_hdr->icmp_type==ICMP_ECHOREPLY){
-                    printf("%d  Src ip : %s my_ip: %s(icmp reply)\n",i,src_ip,my_ip);
+                if(icmp_hdr->icmp_type==ICMP_TIMXCEED){ // if icmp packet is time exceed
+                    printf("%d hop Src ip : %s  (time exceed)\n",i,src_ip);
+                    break;
+                }else if(icmp_hdr->icmp_type==ICMP_ECHOREPLY){ // if icmp packet is reply echo
+                    printf("%d hop Src ip : %s  (icmp reply)\n",i,src_ip);
                     return 0;
                 }else{
-                    printf("unhandle icmp type :%d code :%d by %s my_ip :%s \n",icmp_hdr->icmp_type,icmp_hdr->icmp_code,src_ip,my_ip);
+                    printf("unhandle icmp type :%d code :%d by %s  \n",icmp_hdr->icmp_type,icmp_hdr->icmp_code,src_ip);
+                    break;
                 }
             }
         }
