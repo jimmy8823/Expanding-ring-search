@@ -115,7 +115,7 @@ int main(int argc ,char* argv[]){
 
     struct sockaddr from;
     int from_addr_len = sizeof(from);
-    for(int i=1;i<=ttl;i++){{
+    for(int i=1;i<=ttl;i++){
         memset(send_buf,'\0',sizeof(send_buf));
         ip_hdr =(struct ip *)send_buf;
         icmp_hdr =(struct icmp *) (send_buf+IP_HDRLEN);
