@@ -112,7 +112,6 @@ int main(int argc ,char* argv[]){
     sa.sin_addr = dst;
     char *p;
     ttl = strtol(argv[1],&p,10);// change number string to int 
-
     struct sockaddr from;
     int from_addr_len = sizeof(from);
     for(int i=1;i<=ttl;i++){
@@ -129,12 +128,18 @@ int main(int argc ,char* argv[]){
         if(send_result = sendto(sockfd,send_buf,sizeof(send_buf),0,(struct sockaddr *)&sa,sizeof(struct sockaddr_in))<0){
             perror("send packet failed\n");
         }
+        int count = 0;
         while(1){
             memset(recv_buf,'\0',sizeof(recv_buf));
+            //printf("%d \n",count);
             recvfrom(sockfd_recv,recv_buf,sizeof(recv_buf),0,&from,(socklen_t *)from_addr_len);
             ip_hdr =(struct ip *)(recv_buf + ETHER_HDR_LEN);
             struct in_addr inaddr = ip_hdr->ip_src;
             inet_ntop(AF_INET,&inaddr,src_ip,INET_ADDRSTRLEN);
+            if(count >60){
+                printf("%d hop request time out\n",i);
+                break;
+            }
             if(ip_hdr->ip_p==IPPROTO_ICMP && strcmp(src_ip,my_ip)!=0){ //icmp packet
                 icmp_hdr = (struct icmp *)(recv_buf + ETHER_HDR_LEN + IP_HDRLEN);
                 if(icmp_hdr->icmp_type==ICMP_TIMXCEED){ // if icmp packet is time exceed
@@ -148,6 +153,7 @@ int main(int argc ,char* argv[]){
                     break;
                 }
             }
+            count++; //for timeout
         }
     }
 
